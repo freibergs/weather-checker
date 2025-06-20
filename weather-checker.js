@@ -14,12 +14,10 @@ class WeatherChecker {
         this.windGustThreshold = parseFloat(process.env.WIND_GUST_THRESHOLD);
         this.precipitationThreshold = parseFloat(process.env.PRECIPITATION_THRESHOLD);
         
-        // Precipitation notifications
         this.precipitationUserIds = process.env.PRECIPITATION_USER_IDS ? 
             process.env.PRECIPITATION_USER_IDS.split(',').map(id => id.trim()) : [];
         this.precipitationDaysAhead = parseInt(process.env.PRECIPITATION_DAYS_AHEAD);
         
-        // Wind gust notifications
         this.windUserIds = process.env.WIND_USER_IDS ? 
             process.env.WIND_USER_IDS.split(',').map(id => id.trim()) : [];
         this.windDaysAhead = parseInt(process.env.WIND_DAYS_AHEAD);
@@ -27,7 +25,6 @@ class WeatherChecker {
         this.bearerToken = process.env.BEARER_TOKEN;
         this.endpointUrl = process.env.ENDPOINT_URL;
         
-        // Log file setup
         this.logFile = path.join(__dirname, 'weather-checker.log');
         this.logOutput = [];
     }
@@ -51,7 +48,6 @@ class WeatherChecker {
         const logContent = this.logOutput.join('\n') + '\n';
         
         try {
-            // Add separator for new run
             const separator = '\n' + '='.repeat(80) + '\n';
             const finalContent = separator + logContent;
             
@@ -117,7 +113,6 @@ class WeatherChecker {
             precipitation: this.extractPrecipitationData(locationElement)
         };
         
-        // Only include if we have some data
         return (dataPoint.windGust !== null || dataPoint.windSpeed !== null || dataPoint.precipitation !== null) 
             ? dataPoint : null;
     }
@@ -126,12 +121,10 @@ class WeatherChecker {
         const fromDate = new Date(fromTime);
         const now = new Date();
         
-        // Skip today's data - only future dates
         const todayDateStr = now.toISOString().split('T')[0];
         const fromDateStr = fromDate.toISOString().split('T')[0];
         if (fromDateStr === todayDateStr) return false;
         
-        // Check max days ahead
         const maxDate = new Date(now.getTime() + (maxDaysAhead * 24 * 60 * 60 * 1000));
         return fromDate <= maxDate;
     }
@@ -418,19 +411,15 @@ class WeatherChecker {
             
             const xmlData = await this.fetchWeatherData();
             
-            // Parse precipitation data for precipitation days ahead
             const precipitationData = this.parseWeatherData(xmlData, this.precipitationDaysAhead);
             this.printWeatherSummary(precipitationData, 'NOKRIŠŅU DATI', this.precipitationDaysAhead, 'precipitation');
             const { warnings: precipitationWarnings } = this.checkWeatherWarnings(precipitationData, 'precipitation');
-            
-            // Parse wind data for wind days ahead
             const windData = this.parseWeatherData(xmlData, this.windDaysAhead);
             this.printWeatherSummary(windData, 'VĒJA DATI', this.windDaysAhead, 'wind');
             const { warnings: windWarnings } = this.checkWeatherWarnings(windData, 'wind');
             
             this.log(`\n⚠️ Brīdinājumi: ${precipitationWarnings.length} nokrišņu, ${windWarnings.length} vēja`);
             
-            // Debug: show some wind warnings
             if (windWarnings.length > 0) {
                 this.log('Pirmie 5 vēja brīdinājumi:');
                 windWarnings.slice(0, 5).forEach((w, i) => {
@@ -439,7 +428,6 @@ class WeatherChecker {
                 if (windWarnings.length > 5) this.log(`  ... un vēl ${windWarnings.length - 5}`);
             }
             
-            // Generate messages for both types
             const allMessages = this.generateDiscordMessages(precipitationWarnings, windWarnings);
             
             if (allMessages.length === 0) {
@@ -450,7 +438,6 @@ class WeatherChecker {
             
             this.log(`\nSūta ${allMessages.length} ziņojumus:`);
             
-            // Group messages by type for better display
             const precipitationMessages = allMessages.filter(m => m.message.includes('nokrišņi'));
             const windMessages = allMessages.filter(m => m.message.includes('brāzmas'));
             
