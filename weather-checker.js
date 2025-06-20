@@ -3,6 +3,8 @@
 require('dotenv').config();
 const https = require('https');
 const { DOMParser } = require('xmldom');
+const fs = require('fs');
+const path = require('path');
 
 class WeatherChecker {
     constructor() {
@@ -24,6 +26,39 @@ class WeatherChecker {
         
         this.bearerToken = process.env.BEARER_TOKEN;
         this.endpointUrl = process.env.ENDPOINT_URL;
+        
+        // Log file setup
+        this.logFile = path.join(__dirname, 'weather-checker.log');
+        this.logOutput = [];
+    }
+    
+    log(message) {
+        const timestamp = new Date().toLocaleString('lv-LV', { 
+            timeZone: 'Europe/Riga',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+        });
+        const logEntry = `[${timestamp}] ${message}`;
+        this.logOutput.push(logEntry);
+        console.log(message);
+    }
+    
+    saveLog() {
+        const logContent = this.logOutput.join('\n') + '\n';
+        
+        try {
+            // Add separator for new run
+            const separator = '\n' + '='.repeat(80) + '\n';
+            const finalContent = separator + logContent;
+            
+            fs.appendFileSync(this.logFile, finalContent);
+        } catch (error) {
+            console.error('Kļūda rakstot log failu:', error.message);
+        }
     }
 
     async fetchWeatherData() {
@@ -280,7 +315,7 @@ class WeatherChecker {
     }
 
     printWeatherSummary(weatherData, title, daysAhead, type) {
-        console.log(`\n📊 ${title} (${daysAhead} dienas):`);
+        this.log(`\n📊 ${title} (${daysAhead} dienas):`);
         
         // Group by date and get max/total values per day
         const dailyData = {};
@@ -317,15 +352,15 @@ class WeatherChecker {
                 displayStr = data.windCount > 0 ? `${data.maxWind.toFixed(1)} m/s` : 'Nav vēja datu';
             }
             
-            console.log(`  ${date}: ${displayStr}`);
+            this.log(`  ${date}: ${displayStr}`);
         });
     }
 
     async run() {
         try {
-            console.log(`📍 Atrašanās vieta: LAT ${this.latitude}, LON ${this.longitude}`);
-            console.log(`🔧 Sliekšņi: Vējš >${this.windGustThreshold} m/s, Nokrišņi >${this.precipitationThreshold} mm`);
-            console.log(`🗓️ Šodien: ${new Date().toISOString().split('T')[0]}`);
+            this.log(`📍 Atrašanās vieta: LAT ${this.latitude}, LON ${this.longitude}`);
+            this.log(`🔧 Sliekšņi: Vējš >${this.windGustThreshold} m/s, Nokrišņi >${this.precipitationThreshold} mm`);
+            this.log(`🗓️ Šodien: ${new Date().toISOString().split('T')[0]}`);
             
             const xmlData = await this.fetchWeatherData();
             
@@ -339,59 +374,62 @@ class WeatherChecker {
             this.printWeatherSummary(windData, 'VĒJA DATI', this.windDaysAhead, 'wind');
             const { warnings: windWarnings } = this.checkWeatherWarnings(windData, 'wind');
             
-            console.log(`\n⚠️ Brīdinājumi: ${precipitationWarnings.length} nokrišņu, ${windWarnings.length} vēja`);
+            this.log(`\n⚠️ Brīdinājumi: ${precipitationWarnings.length} nokrišņu, ${windWarnings.length} vēja`);
             
             // Debug: show some wind warnings
             if (windWarnings.length > 0) {
-                console.log('Pirmie 5 vēja brīdinājumi:');
+                this.log('Pirmie 5 vēja brīdinājumi:');
                 windWarnings.slice(0, 5).forEach((w, i) => {
-                    console.log(`  ${i+1}. ${w.date} ${new Date(w.time).toLocaleTimeString('lv-LV', {hour: '2-digit', minute: '2-digit'})}: ${w.windGust} m/s`);
+                    this.log(`  ${i+1}. ${w.date} ${new Date(w.time).toLocaleTimeString('lv-LV', {hour: '2-digit', minute: '2-digit'})}: ${w.windGust} m/s`);
                 });
-                if (windWarnings.length > 5) console.log(`  ... un vēl ${windWarnings.length - 5}`);
+                if (windWarnings.length > 5) this.log(`  ... un vēl ${windWarnings.length - 5}`);
             }
             
             // Generate messages for both types
             const allMessages = this.generateDiscordMessages(precipitationWarnings, windWarnings);
             
             if (allMessages.length === 0) {
-                console.log('✅ Nav brīdinājumu - laikapstākļi ir piemēroti');
+                this.log('✅ Nav brīdinājumu - laikapstākļi ir piemēroti');
+                this.saveLog();
                 return false;
             }
             
-            console.log(`\nSūta ${allMessages.length} ziņojumus:`);
+            this.log(`\nSūta ${allMessages.length} ziņojumus:`);
             
             // Group messages by type for better display
             const precipitationMessages = allMessages.filter(m => m.message.includes('nokrišņi'));
             const windMessages = allMessages.filter(m => m.message.includes('brāzmas'));
             
             if (precipitationMessages.length > 0) {
-                console.log('\n🌧️ NOKRIŠŅU ZIŅOJUMI:');
+                this.log('\n🌧️ NOKRIŠŅU ZIŅOJUMI:');
                 precipitationMessages.forEach((message, index) => {
-                    console.log(`\nZiņojums ${index + 1}:`);
-                    console.log(JSON.stringify(message, null, 2));
+                    this.log(`\nZiņojums ${index + 1}:`);
+                    this.log(JSON.stringify(message, null, 2));
                 });
             }
             
             if (windMessages.length > 0) {
-                console.log('\n💨 VĒJA ZIŅOJUMI:');
+                this.log('\n💨 VĒJA ZIŅOJUMI:');
                 windMessages.forEach((message, index) => {
-                    console.log(`\nZiņojums ${index + 1}:`);
-                    console.log(JSON.stringify(message, null, 2));
+                    this.log(`\nZiņojums ${index + 1}:`);
+                    this.log(JSON.stringify(message, null, 2));
                 });
             }
             
-            console.log(`\n📤 Sūtīšanas process:`);
+            this.log(`\n📤 Sūtīšanas process:`);
             let allSent = true;
             for (const message of allMessages) {
-                console.log(`-> Sūtam lietotājam ${message.discordid}`);
+                this.log(`-> Sūtam lietotājam ${message.discordid}`);
                 const sent = await this.sendDiscordMessage(message);
                 if (!sent) allSent = false;
             }
             
+            this.saveLog();
             return allSent;
             
         } catch (error) {
-            console.error('❌ Kļūda:', error.message);
+            this.log(`❌ Kļūda: ${error.message}`);
+            this.saveLog();
             process.exit(1);
         }
     }
