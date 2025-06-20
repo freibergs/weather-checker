@@ -92,71 +92,66 @@ class WeatherChecker {
     parseWeatherData(xmlData, maxDaysAhead) {
         const parser = new DOMParser();
         const doc = parser.parseFromString(xmlData, 'text/xml');
-        
         const timeElements = doc.getElementsByTagName('time');
-        const weatherData = [];
         
-        for (let i = 0; i < timeElements.length; i++) {
-            const timeElement = timeElements[i];
-            const fromTime = timeElement.getAttribute('from');
-            const toTime = timeElement.getAttribute('to');
-            
-            if (!fromTime || !toTime) continue;
-            
-            const fromDate = new Date(fromTime);
-            const toDate = new Date(toTime);
-            const now = new Date();
-            
-            // Only include future dates (exclude today)
-            const todayDateStr = now.toISOString().split('T')[0];
-            const fromDateStr = fromDate.toISOString().split('T')[0];
-            
-            // Skip today's data - only future dates
-            if (fromDateStr === todayDateStr) continue;
-            
-            const maxDate = new Date(now.getTime() + (maxDaysAhead * 24 * 60 * 60 * 1000));
-            if (fromDate > maxDate) continue;
-            
-            const locationElement = timeElement.getElementsByTagName('location')[0];
-            if (!locationElement) continue;
-            
-            const dataPoint = {
-                date: fromDate.toISOString().split('T')[0],
-                time: fromTime,
-                windGust: null,
-                windSpeed: null,
-                precipitation: null
-            };
-            
-            const windGustElements = locationElement.getElementsByTagName('windGust');
-            for (let j = 0; j < windGustElements.length; j++) {
-                const element = windGustElements[j];
-                if (element.getAttribute('id') === 'ff_gust') {
-                    dataPoint.windGust = parseFloat(element.getAttribute('mps'));
-                    break;
-                }
-            }
-            
-            const windSpeedElements = locationElement.getElementsByTagName('windSpeed');
-            for (let j = 0; j < windSpeedElements.length; j++) {
-                const element = windSpeedElements[j];
-                if (element.getAttribute('id') === 'ff') {
-                    dataPoint.windSpeed = parseFloat(element.getAttribute('mps'));
-                    break;
-                }
-            }
-            
-            const precipitationElements = locationElement.getElementsByTagName('precipitation');
-            if (precipitationElements.length > 0) {
-                dataPoint.precipitation = parseFloat(precipitationElements[0].getAttribute('value'));
-            }
-            
-            if (dataPoint.windGust !== null || dataPoint.windSpeed !== null || dataPoint.precipitation !== null) {
-                weatherData.push(dataPoint);
+        return Array.from(timeElements)
+            .map(timeElement => this.parseTimeElement(timeElement, maxDaysAhead))
+            .filter(Boolean);
+    }
+    
+    parseTimeElement(timeElement, maxDaysAhead) {
+        const fromTime = timeElement.getAttribute('from');
+        const toTime = timeElement.getAttribute('to');
+        
+        if (!fromTime || !toTime) return null;
+        if (!this.isValidTimeRange(fromTime, maxDaysAhead)) return null;
+        
+        const locationElement = timeElement.getElementsByTagName('location')[0];
+        if (!locationElement) return null;
+        
+        const dataPoint = {
+            date: new Date(fromTime).toISOString().split('T')[0],
+            time: fromTime,
+            windGust: this.extractWindData(locationElement, 'windGust', 'ff_gust'),
+            windSpeed: this.extractWindData(locationElement, 'windSpeed', 'ff'),
+            precipitation: this.extractPrecipitationData(locationElement)
+        };
+        
+        // Only include if we have some data
+        return (dataPoint.windGust !== null || dataPoint.windSpeed !== null || dataPoint.precipitation !== null) 
+            ? dataPoint : null;
+    }
+    
+    isValidTimeRange(fromTime, maxDaysAhead) {
+        const fromDate = new Date(fromTime);
+        const now = new Date();
+        
+        // Skip today's data - only future dates
+        const todayDateStr = now.toISOString().split('T')[0];
+        const fromDateStr = fromDate.toISOString().split('T')[0];
+        if (fromDateStr === todayDateStr) return false;
+        
+        // Check max days ahead
+        const maxDate = new Date(now.getTime() + (maxDaysAhead * 24 * 60 * 60 * 1000));
+        return fromDate <= maxDate;
+    }
+    
+    extractWindData(locationElement, tagName, expectedId) {
+        const elements = locationElement.getElementsByTagName(tagName);
+        for (let i = 0; i < elements.length; i++) {
+            const element = elements[i];
+            if (element.getAttribute('id') === expectedId) {
+                return parseFloat(element.getAttribute('mps'));
             }
         }
-        
-        return weatherData;
+        return null;
+    }
+    
+    extractPrecipitationData(locationElement) {
+        const precipitationElements = locationElement.getElementsByTagName('precipitation');
+        return precipitationElements.length > 0 
+            ? parseFloat(precipitationElements[0].getAttribute('value')) 
+            : null;
     }
 
     checkWeatherWarnings(weatherData, type = 'both') {
@@ -201,84 +196,99 @@ class WeatherChecker {
     generateDiscordMessages(precipitationWarnings, windWarnings) {
         const messages = [];
         
-        // Generate precipitation messages
-        if (precipitationWarnings.length > 0 && this.precipitationUserIds.length > 0) {
-            const dayData = {};
-            precipitationWarnings.forEach(warning => {
-                if (!dayData[warning.date]) {
-                    dayData[warning.date] = { totalPrecipitation: 0 };
-                }
-                if (warning.precipitation && warning.precipitation > this.precipitationThreshold) {
-                    dayData[warning.date].totalPrecipitation += warning.precipitation;
-                }
-            });
-
-            let messageText = "⚠️ Gaidāmi nokrišņi:\n";
-            const daysWithData = Object.keys(dayData).sort();
-            const dayMessages = [];
-            
-            daysWithData.forEach(date => {
-                const data = dayData[date];
-                if (data.totalPrecipitation > 0) {
-                    dayMessages.push(`${date} – nokrišņi ${data.totalPrecipitation.toFixed(1)} mm`);
-                }
-            });
-            
-            if (dayMessages.length > 0) {
-                messageText += dayMessages.join("\n");
-                
-                this.precipitationUserIds.forEach(userId => {
-                    messages.push({
-                        discordid: userId,
-                        message: messageText
-                    });
-                });
-            }
-        }
+        const precipitationMessages = this.generatePrecipitationMessages(precipitationWarnings);
+        const windMessages = this.generateWindMessages(windWarnings);
         
-        // Generate wind messages
-        if (windWarnings.length > 0 && this.windUserIds.length > 0) {
-            const dayData = {};
-            windWarnings.forEach(warning => {
-                if (!dayData[warning.date]) {
-                    dayData[warning.date] = { maxWindGust: 0, maxWindSpeed: 0 };
-                }
-                if (warning.windGust && warning.windGust > this.windGustThreshold) {
-                    dayData[warning.date].maxWindGust = Math.max(dayData[warning.date].maxWindGust, warning.windGust);
-                }
-                if (warning.windSpeed) {
-                    dayData[warning.date].maxWindSpeed = Math.max(dayData[warning.date].maxWindSpeed, warning.windSpeed);
-                }
-            });
-
-            let messageText = "⚠️ Gaidāmas stipras vēja brāzmas:\n";
-            const daysWithData = Object.keys(dayData).sort();
-            const dayMessages = [];
-            
-            daysWithData.forEach(date => {
-                const data = dayData[date];
-                if (data.maxWindGust > 0) {
-                    let dayMessage = `${date} – brāzmas līdz ${data.maxWindGust.toFixed(1)} m/s`;
-                    if (data.maxWindSpeed > 0) {
-                        dayMessage += `, vējš līdz ${data.maxWindSpeed.toFixed(1)} m/s`;
-                    }
-                    dayMessages.push(dayMessage);
-                }
-            });
-            
-            if (dayMessages.length > 0) {
-                messageText += dayMessages.join("\n");
-                
-                this.windUserIds.forEach(userId => {
-                    messages.push({
-                        discordid: userId,
-                        message: messageText
-                    });
-                });
-            }
-        }
+        return [...precipitationMessages, ...windMessages];
+    }
+    
+    generatePrecipitationMessages(warnings) {
+        if (warnings.length === 0 || this.precipitationUserIds.length === 0) return [];
         
-        return messages;
+        const dayData = this.aggregatePrecipitationWarnings(warnings);
+        const messageText = this.formatPrecipitationMessage(dayData);
+        
+        if (!messageText) return [];
+        
+        return this.precipitationUserIds.map(userId => ({
+            discordid: userId,
+            message: messageText
+        }));
+    }
+    
+    generateWindMessages(warnings) {
+        if (warnings.length === 0 || this.windUserIds.length === 0) return [];
+        
+        const dayData = this.aggregateWindWarnings(warnings);
+        const messageText = this.formatWindMessage(dayData);
+        
+        if (!messageText) return [];
+        
+        return this.windUserIds.map(userId => ({
+            discordid: userId,
+            message: messageText
+        }));
+    }
+    
+    aggregatePrecipitationWarnings(warnings) {
+        const dayData = {};
+        warnings.forEach(warning => {
+            if (!dayData[warning.date]) {
+                dayData[warning.date] = { totalPrecipitation: 0 };
+            }
+            if (warning.precipitation && warning.precipitation > this.precipitationThreshold) {
+                dayData[warning.date].totalPrecipitation += warning.precipitation;
+            }
+        });
+        return dayData;
+    }
+    
+    aggregateWindWarnings(warnings) {
+        const dayData = {};
+        warnings.forEach(warning => {
+            if (!dayData[warning.date]) {
+                dayData[warning.date] = { maxWindGust: 0, maxWindSpeed: 0 };
+            }
+            if (warning.windGust && warning.windGust > this.windGustThreshold) {
+                dayData[warning.date].maxWindGust = Math.max(dayData[warning.date].maxWindGust, warning.windGust);
+            }
+            if (warning.windSpeed) {
+                dayData[warning.date].maxWindSpeed = Math.max(dayData[warning.date].maxWindSpeed, warning.windSpeed);
+            }
+        });
+        return dayData;
+    }
+    
+    formatPrecipitationMessage(dayData) {
+        const dayMessages = [];
+        const sortedDates = Object.keys(dayData).sort();
+        
+        sortedDates.forEach(date => {
+            const data = dayData[date];
+            if (data.totalPrecipitation > 0) {
+                dayMessages.push(`${date} – nokrišņi ${data.totalPrecipitation.toFixed(1)} mm`);
+            }
+        });
+        
+        return dayMessages.length > 0 ? "⚠️ Gaidāmi nokrišņi:\n" + dayMessages.join("\n") : null;
+    }
+    
+    formatWindMessage(dayData) {
+        const dayMessages = [];
+        const sortedDates = Object.keys(dayData).sort();
+        
+        sortedDates.forEach(date => {
+            const data = dayData[date];
+            if (data.maxWindGust > 0) {
+                let dayMessage = `${date} – brāzmas līdz ${data.maxWindGust.toFixed(1)} m/s`;
+                if (data.maxWindSpeed > 0) {
+                    dayMessage += `, vējš līdz ${data.maxWindSpeed.toFixed(1)} m/s`;
+                }
+                dayMessages.push(dayMessage);
+            }
+        });
+        
+        return dayMessages.length > 0 ? "⚠️ Gaidāmas stipras vēja brāzmas:\n" + dayMessages.join("\n") : null;
     }
 
     async sendDiscordMessage(discordMessage) {
@@ -335,8 +345,18 @@ class WeatherChecker {
     printWeatherSummary(weatherData, title, daysAhead, type) {
         this.log(`\n📊 ${title} (${daysAhead} dienas):`);
         
-        // Group by date and get max/total values per day
+        const dailyData = this.aggregateWeatherDataByDay(weatherData);
+        const sortedDates = Object.keys(dailyData).sort();
+        
+        sortedDates.forEach(date => {
+            const displayStr = this.formatDayData(dailyData[date], type);
+            this.log(`  ${date}: ${displayStr}`);
+        });
+    }
+    
+    aggregateWeatherDataByDay(weatherData) {
         const dailyData = {};
+        
         weatherData.forEach(point => {
             if (!dailyData[point.date]) {
                 dailyData[point.date] = {
@@ -348,42 +368,46 @@ class WeatherChecker {
                 };
             }
             
-            if (point.windGust !== null) {
-                dailyData[point.date].maxWindGust = Math.max(dailyData[point.date].maxWindGust, point.windGust);
-                dailyData[point.date].windCount++;
-            }
-            
-            if (point.windSpeed !== null) {
-                dailyData[point.date].maxWindSpeed = Math.max(dailyData[point.date].maxWindSpeed, point.windSpeed);
-            }
-            
-            if (point.precipitation !== null) {
-                dailyData[point.date].totalPrecipitation += point.precipitation;
-                dailyData[point.date].precipCount++;
-            }
+            this.updateDayData(dailyData[point.date], point);
         });
         
-        // Sort dates and display only the relevant data type
-        const sortedDates = Object.keys(dailyData).sort();
-        sortedDates.forEach(date => {
-            const data = dailyData[date];
-            let displayStr = '';
+        return dailyData;
+    }
+    
+    updateDayData(dayData, point) {
+        if (point.windGust !== null) {
+            dayData.maxWindGust = Math.max(dayData.maxWindGust, point.windGust);
+            dayData.windCount++;
+        }
+        
+        if (point.windSpeed !== null) {
+            dayData.maxWindSpeed = Math.max(dayData.maxWindSpeed, point.windSpeed);
+        }
+        
+        if (point.precipitation !== null) {
+            dayData.totalPrecipitation += point.precipitation;
+            dayData.precipCount++;
+        }
+    }
+    
+    formatDayData(data, type) {
+        if (type === 'precipitation') {
+            return data.precipCount > 0 
+                ? `${data.totalPrecipitation.toFixed(1)} mm` 
+                : 'Nav nokrišņu datu';
+        }
+        
+        if (type === 'wind') {
+            if (data.windCount === 0) return 'Nav vēja datu';
             
-            if (type === 'precipitation') {
-                displayStr = data.precipCount > 0 ? `${data.totalPrecipitation.toFixed(1)} mm` : 'Nav nokrišņu datu';
-            } else if (type === 'wind') {
-                if (data.windCount > 0) {
-                    displayStr = `brāzmas ${data.maxWindGust.toFixed(1)} m/s`;
-                    if (data.maxWindSpeed > 0) {
-                        displayStr += `, vējš ${data.maxWindSpeed.toFixed(1)} m/s`;
-                    }
-                } else {
-                    displayStr = 'Nav vēja datu';
-                }
+            let result = `brāzmas ${data.maxWindGust.toFixed(1)} m/s`;
+            if (data.maxWindSpeed > 0) {
+                result += `, vējš ${data.maxWindSpeed.toFixed(1)} m/s`;
             }
-            
-            this.log(`  ${date}: ${displayStr}`);
-        });
+            return result;
+        }
+        
+        return '';
     }
 
     async run() {
