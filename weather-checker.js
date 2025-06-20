@@ -124,6 +124,7 @@ class WeatherChecker {
                 date: fromDate.toISOString().split('T')[0],
                 time: fromTime,
                 windGust: null,
+                windSpeed: null,
                 precipitation: null
             };
             
@@ -136,12 +137,21 @@ class WeatherChecker {
                 }
             }
             
+            const windSpeedElements = locationElement.getElementsByTagName('windSpeed');
+            for (let j = 0; j < windSpeedElements.length; j++) {
+                const element = windSpeedElements[j];
+                if (element.getAttribute('id') === 'ff') {
+                    dataPoint.windSpeed = parseFloat(element.getAttribute('mps'));
+                    break;
+                }
+            }
+            
             const precipitationElements = locationElement.getElementsByTagName('precipitation');
             if (precipitationElements.length > 0) {
                 dataPoint.precipitation = parseFloat(precipitationElements[0].getAttribute('value'));
             }
             
-            if (dataPoint.windGust !== null || dataPoint.precipitation !== null) {
+            if (dataPoint.windGust !== null || dataPoint.windSpeed !== null || dataPoint.precipitation !== null) {
                 weatherData.push(dataPoint);
             }
         }
@@ -167,6 +177,7 @@ class WeatherChecker {
                     date: data.date,
                     time: data.time,
                     windGust: data.windGust,
+                    windSpeed: data.windSpeed,
                     precipitation: data.precipitation,
                     reasons: []
                 };
@@ -230,10 +241,13 @@ class WeatherChecker {
             const dayData = {};
             windWarnings.forEach(warning => {
                 if (!dayData[warning.date]) {
-                    dayData[warning.date] = { maxWind: 0 };
+                    dayData[warning.date] = { maxWindGust: 0, maxWindSpeed: 0 };
                 }
                 if (warning.windGust && warning.windGust > this.windGustThreshold) {
-                    dayData[warning.date].maxWind = Math.max(dayData[warning.date].maxWind, warning.windGust);
+                    dayData[warning.date].maxWindGust = Math.max(dayData[warning.date].maxWindGust, warning.windGust);
+                }
+                if (warning.windSpeed) {
+                    dayData[warning.date].maxWindSpeed = Math.max(dayData[warning.date].maxWindSpeed, warning.windSpeed);
                 }
             });
 
@@ -243,8 +257,12 @@ class WeatherChecker {
             
             daysWithData.forEach(date => {
                 const data = dayData[date];
-                if (data.maxWind > 0) {
-                    dayMessages.push(`${date} – brāzmas līdz ${data.maxWind.toFixed(1)} m/s`);
+                if (data.maxWindGust > 0) {
+                    let dayMessage = `${date} – brāzmas līdz ${data.maxWindGust.toFixed(1)} m/s`;
+                    if (data.maxWindSpeed > 0) {
+                        dayMessage += `, vējš līdz ${data.maxWindSpeed.toFixed(1)} m/s`;
+                    }
+                    dayMessages.push(dayMessage);
                 }
             });
             
@@ -322,7 +340,8 @@ class WeatherChecker {
         weatherData.forEach(point => {
             if (!dailyData[point.date]) {
                 dailyData[point.date] = {
-                    maxWind: 0,
+                    maxWindGust: 0,
+                    maxWindSpeed: 0,
                     totalPrecipitation: 0,
                     windCount: 0,
                     precipCount: 0
@@ -330,8 +349,12 @@ class WeatherChecker {
             }
             
             if (point.windGust !== null) {
-                dailyData[point.date].maxWind = Math.max(dailyData[point.date].maxWind, point.windGust);
+                dailyData[point.date].maxWindGust = Math.max(dailyData[point.date].maxWindGust, point.windGust);
                 dailyData[point.date].windCount++;
+            }
+            
+            if (point.windSpeed !== null) {
+                dailyData[point.date].maxWindSpeed = Math.max(dailyData[point.date].maxWindSpeed, point.windSpeed);
             }
             
             if (point.precipitation !== null) {
@@ -349,7 +372,14 @@ class WeatherChecker {
             if (type === 'precipitation') {
                 displayStr = data.precipCount > 0 ? `${data.totalPrecipitation.toFixed(1)} mm` : 'Nav nokrišņu datu';
             } else if (type === 'wind') {
-                displayStr = data.windCount > 0 ? `${data.maxWind.toFixed(1)} m/s` : 'Nav vēja datu';
+                if (data.windCount > 0) {
+                    displayStr = `brāzmas ${data.maxWindGust.toFixed(1)} m/s`;
+                    if (data.maxWindSpeed > 0) {
+                        displayStr += `, vējš ${data.maxWindSpeed.toFixed(1)} m/s`;
+                    }
+                } else {
+                    displayStr = 'Nav vēja datu';
+                }
             }
             
             this.log(`  ${date}: ${displayStr}`);
