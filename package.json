@@ -1,0 +1,22 @@
+{
+  "name": "weather-checker-riga",
+  "version": "1.0.0",
+  "description": "Weather monitoring script for Riga using yr.no API",
+  "main": "weather-checker.js",
+  "scripts": {
+    "start": "node weather-checker.js",
+    "test": "node weather-checker.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.5.0",
+    "xmldom": "^0.6.0"
+  },
+  "keywords": [
+    "weather",
+    "monitoring",
+    "riga",
+    "yr.no"
+  ],
+  "author": "",
+  "license": "MIT"
+}
