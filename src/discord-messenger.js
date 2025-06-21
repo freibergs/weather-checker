@@ -93,8 +93,15 @@ class DiscordMessenger {
     formatWindMessage(hourlyData) {
         if (hourlyData.length === 0) return null;
         
-        const hourlyMessages = hourlyData.map(data => {
-            return `${data.date} – ${data.time} – ${data.windSpeed.toFixed(1)} (${data.windGust.toFixed(1)}) – vējš (brāzmās) m/s`;
+        const hourlyMessages = [];
+        let currentDate = null;
+        
+        hourlyData.forEach(data => {
+            if (currentDate !== null && currentDate !== data.date) {
+                hourlyMessages.push("");
+            }
+            hourlyMessages.push(`${data.date} – ${data.time} – ${data.windSpeed.toFixed(1)} (${data.windGust.toFixed(1)}) – vējš (brāzmās) m/s`);
+            currentDate = data.date;
         });
         
         return "⚠️ Gaidāmas stipras vēja brāzmas:\n" + hourlyMessages.join("\n");
