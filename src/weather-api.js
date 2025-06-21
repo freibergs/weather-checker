@@ -1,5 +1,5 @@
-const https = require('https');
-const { DOMParser } = require('xmldom');
+import https from 'https';
+import { DOMParser } from 'xmldom';
 
 class WeatherAPI {
     constructor(config) {
@@ -97,4 +97,4 @@ class WeatherAPI {
     }
 }
 
-module.exports = WeatherAPI;
+export default WeatherAPI;

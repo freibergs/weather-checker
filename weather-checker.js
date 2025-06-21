@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 
-const config = require('./src/config');
-const Logger = require('./src/logger');
-const WeatherAPI = require('./src/weather-api');
-const WeatherAnalyzer = require('./src/weather-analyzer');
-const DiscordMessenger = require('./src/discord-messenger');
+import config from './src/config.js';
+import Logger from './src/logger.js';
+import WeatherAPI from './src/weather-api.js';
+import WeatherAnalyzer from './src/weather-analyzer.js';
+import DiscordMessenger from './src/discord-messenger.js';
 
 class WeatherChecker {
     constructor() {
@@ -91,11 +91,13 @@ class WeatherChecker {
     }
 }
 
-if (require.main === module) {
+const isMainModule = import.meta.url === `file://${process.argv[1]}`;
+
+if (isMainModule) {
     const checker = new WeatherChecker();
     checker.run().then(hasWarnings => {
         process.exit(hasWarnings ? 1 : 0);
     });
 }
 
-module.exports = WeatherChecker;
+export default WeatherChecker;

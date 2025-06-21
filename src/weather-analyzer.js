@@ -112,4 +112,4 @@ class WeatherAnalyzer {
     }
 }
 
-module.exports = WeatherAnalyzer;
+export default WeatherAnalyzer;

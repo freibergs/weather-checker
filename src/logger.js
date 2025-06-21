@@ -1,5 +1,5 @@
-const fs = require('fs');
-const path = require('path');
+import fs from 'fs';
+import path from 'path';
 
 class Logger {
     constructor(logFileName = 'weather-checker.log') {
@@ -40,4 +40,4 @@ class Logger {
     }
 }
 
-module.exports = Logger;
+export default Logger;

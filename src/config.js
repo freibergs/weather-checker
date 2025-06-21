@@ -1,4 +1,4 @@
-require('dotenv').config();
+import 'dotenv/config';
 
 class Config {
     constructor() {
@@ -31,4 +31,4 @@ class Config {
     }
 }
 
-module.exports = new Config();
+export default new Config();

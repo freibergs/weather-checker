@@ -1,11 +1,11 @@
-const WeatherChecker = require('../weather-checker');
-const config = require('./config');
-const Logger = require('./logger');
-const WeatherAPI = require('./weather-api');
-const WeatherAnalyzer = require('./weather-analyzer');
-const DiscordMessenger = require('./discord-messenger');
+import WeatherChecker from '../weather-checker.js';
+import config from './config.js';
+import Logger from './logger.js';
+import WeatherAPI from './weather-api.js';
+import WeatherAnalyzer from './weather-analyzer.js';
+import DiscordMessenger from './discord-messenger.js';
 
-module.exports = {
+export {
     WeatherChecker,
     config,
     Logger,

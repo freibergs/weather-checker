@@ -2,6 +2,7 @@
   "name": "weather-checker-riga",
   "version": "1.0.0",
   "description": "Weather monitoring script for Riga using yr.no API",
+  "type": "module",
   "main": "weather-checker.js",
   "scripts": {
     "start": "node weather-checker.js",

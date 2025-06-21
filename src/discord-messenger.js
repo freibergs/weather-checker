@@ -1,4 +1,4 @@
-const https = require('https');
+import https from 'https';
 
 class DiscordMessenger {
     constructor(config, logger) {
@@ -30,8 +30,8 @@ class DiscordMessenger {
     generateWindMessages(warnings) {
         if (warnings.length === 0 || this.config.windUserIds.length === 0) return [];
         
-        const dayData = this.aggregateWindWarnings(warnings);
-        const messageText = this.formatWindMessage(dayData);
+        const hourlyData = this.aggregateWindWarnings(warnings);
+        const messageText = this.formatWindMessage(hourlyData);
         
         if (!messageText) return [];
         
@@ -55,19 +55,25 @@ class DiscordMessenger {
     }
     
     aggregateWindWarnings(warnings) {
-        const dayData = {};
+        const hourlyData = [];
         warnings.forEach(warning => {
-            if (!dayData[warning.date]) {
-                dayData[warning.date] = { maxWindGust: 0, maxWindSpeed: 0 };
-            }
             if (warning.windGust && warning.windGust > this.config.windGustThreshold) {
-                dayData[warning.date].maxWindGust = Math.max(dayData[warning.date].maxWindGust, warning.windGust);
-            }
-            if (warning.windSpeed) {
-                dayData[warning.date].maxWindSpeed = Math.max(dayData[warning.date].maxWindSpeed, warning.windSpeed);
+                const time = new Date(warning.time);
+                const timeStr = time.toLocaleTimeString('lv-LV', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    timeZone: 'Europe/Riga'
+                });
+                
+                hourlyData.push({
+                    date: warning.date,
+                    time: timeStr,
+                    windSpeed: warning.windSpeed || 0,
+                    windGust: warning.windGust
+                });
             }
         });
-        return dayData;
+        return hourlyData;
     }
     
     formatPrecipitationMessage(dayData) {
@@ -84,22 +90,14 @@ class DiscordMessenger {
         return dayMessages.length > 0 ? "⚠️ Gaidāmi nokrišņi:\n" + dayMessages.join("\n") : null;
     }
     
-    formatWindMessage(dayData) {
-        const dayMessages = [];
-        const sortedDates = Object.keys(dayData).sort();
+    formatWindMessage(hourlyData) {
+        if (hourlyData.length === 0) return null;
         
-        sortedDates.forEach(date => {
-            const data = dayData[date];
-            if (data.maxWindGust > 0) {
-                let dayMessage = `${date} – brāzmas līdz ${data.maxWindGust.toFixed(1)} m/s`;
-                if (data.maxWindSpeed > 0) {
-                    dayMessage += `, vējš līdz ${data.maxWindSpeed.toFixed(1)} m/s`;
-                }
-                dayMessages.push(dayMessage);
-            }
+        const hourlyMessages = hourlyData.map(data => {
+            return `${data.date} – ${data.time} – ${data.windSpeed.toFixed(1)} (${data.windGust.toFixed(1)}) – vējš (brāzmās) m/s`;
         });
         
-        return dayMessages.length > 0 ? "⚠️ Gaidāmas stipras vēja brāzmas:\n" + dayMessages.join("\n") : null;
+        return "⚠️ Gaidāmas stipras vēja brāzmas:\n" + hourlyMessages.join("\n");
     }
 
     async sendDiscordMessage(discordMessage) {
@@ -154,4 +152,4 @@ class DiscordMessenger {
     }
 }
 
-module.exports = DiscordMessenger;
+export default DiscordMessenger;
