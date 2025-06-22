@@ -20,7 +20,7 @@ class WeatherChecker {
             this.config.validate();
             
             this.logger.log(`📍 Atrašanās vieta: LAT ${this.config.latitude}, LON ${this.config.longitude}`);
-            this.logger.log(`🔧 Sliekšņi: Vējš >${this.config.windGustThreshold} m/s, Nokrišņi >${this.config.precipitationThreshold} mm`);
+            this.logger.log(`🔧 Sliekšņi: Vēja brāzmas >${this.config.windGustThreshold} m/s, Vējš >${this.config.windSpeedThreshold} m/s, Nokrišņi >${this.config.precipitationThreshold} mm`);
             this.logger.log(`🗓️ Šodien: ${new Date().toISOString().split('T')[0]}`);
             
             const xmlData = await this.weatherAPI.fetchWeatherData();
@@ -54,7 +54,7 @@ class WeatherChecker {
             this.logger.log(`\nSūta ${allMessages.length} ziņojumus:`);
             
             const precipitationMessages = allMessages.filter(m => m.message.includes('nokrišņi'));
-            const windMessages = allMessages.filter(m => m.message.includes('brāzmas'));
+            const windMessages = allMessages.filter(m => m.message.includes('vējš'));
             
             if (precipitationMessages.length > 0) {
                 this.logger.log('\n🌧️ NOKRIŠŅU ZIŅOJUMI:');

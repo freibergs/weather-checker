@@ -57,7 +57,10 @@ class DiscordMessenger {
     aggregateWindWarnings(warnings) {
         const hourlyData = [];
         warnings.forEach(warning => {
-            if (warning.windGust && warning.windGust > this.config.windGustThreshold) {
+            const hasStrongGust = warning.windGust && warning.windGust > this.config.windGustThreshold;
+            const hasStrongWind = warning.windSpeed && warning.windSpeed > this.config.windSpeedThreshold;
+            
+            if (hasStrongGust || hasStrongWind) {
                 const time = new Date(warning.time);
                 const timeStr = time.toLocaleTimeString('lv-LV', {
                     hour: '2-digit',
@@ -69,7 +72,9 @@ class DiscordMessenger {
                     date: warning.date,
                     time: timeStr,
                     windSpeed: warning.windSpeed || 0,
-                    windGust: warning.windGust
+                    windGust: warning.windGust || 0,
+                    hasStrongGust,
+                    hasStrongWind
                 });
             }
         });
@@ -100,11 +105,21 @@ class DiscordMessenger {
             if (currentDate !== null && currentDate !== data.date) {
                 hourlyMessages.push("");
             }
-            hourlyMessages.push(`${data.date} – ${data.time} – ${data.windSpeed.toFixed(1)} (${data.windGust.toFixed(1)}) – vējš (brāzmās) m/s`);
+            
+            let windInfo = "";
+            if (data.hasStrongGust && data.hasStrongWind) {
+                windInfo = `${data.windSpeed.toFixed(1)} (${data.windGust.toFixed(1)}) – vējš (brāzmās) m/s`;
+            } else if (data.hasStrongGust) {
+                windInfo = `${data.windSpeed.toFixed(1)} (${data.windGust.toFixed(1)}) – vējš (brāzmās) m/s`;
+            } else if (data.hasStrongWind) {
+                windInfo = `${data.windSpeed.toFixed(1)} – vējš m/s`;
+            }
+            
+            hourlyMessages.push(`${data.date} – ${data.time} – ${windInfo}`);
             currentDate = data.date;
         });
         
-        return "⚠️ Gaidāmas stipras vēja brāzmas:\n" + hourlyMessages.join("\n");
+        return "⚠️ Gaidāms stiprs vējš:\n" + hourlyMessages.join("\n");
     }
 
     async sendDiscordMessage(discordMessage) {

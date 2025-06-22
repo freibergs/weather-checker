@@ -10,12 +10,13 @@ class WeatherAnalyzer {
         
         for (const data of weatherData) {
             const hasStrongWind = data.windGust && data.windGust > this.config.windGustThreshold;
+            const hasStrongWindSpeed = data.windSpeed && data.windSpeed > this.config.windSpeedThreshold;
             const hasHeavyRain = data.precipitation && data.precipitation > this.config.precipitationThreshold;
             
             let shouldInclude = false;
-            if (type === 'wind' && hasStrongWind) shouldInclude = true;
+            if (type === 'wind' && (hasStrongWind || hasStrongWindSpeed)) shouldInclude = true;
             if (type === 'precipitation' && hasHeavyRain) shouldInclude = true;
-            if (type === 'both' && (hasStrongWind || hasHeavyRain)) shouldInclude = true;
+            if (type === 'both' && (hasStrongWind || hasStrongWindSpeed || hasHeavyRain)) shouldInclude = true;
             
             if (shouldInclude) {
                 const warning = {
@@ -29,6 +30,10 @@ class WeatherAnalyzer {
                 
                 if (hasStrongWind) {
                     warning.reasons.push(`Stiprs vējš: ${data.windGust} m/s (brāzmas)`);
+                }
+                
+                if (hasStrongWindSpeed) {
+                    warning.reasons.push(`Stiprs vējš: ${data.windSpeed} m/s`);
                 }
                 
                 if (hasHeavyRain) {

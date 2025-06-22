@@ -5,6 +5,7 @@ class Config {
         this.latitude = process.env.LATITUDE;
         this.longitude = process.env.LONGITUDE;
         this.windGustThreshold = parseFloat(process.env.WIND_GUST_THRESHOLD);
+        this.windSpeedThreshold = parseFloat(process.env.WIND_SPEED_THRESHOLD);
         this.precipitationThreshold = parseFloat(process.env.PRECIPITATION_THRESHOLD);
         
         this.precipitationUserIds = process.env.PRECIPITATION_USER_IDS ? 
