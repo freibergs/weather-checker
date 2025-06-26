@@ -91,9 +91,17 @@ class WeatherAPI {
     
     extractPrecipitationData(locationElement) {
         const precipitationElements = locationElement.getElementsByTagName('precipitation');
-        return precipitationElements.length > 0 
-            ? parseFloat(precipitationElements[0].getAttribute('value')) 
-            : null;
+        if (precipitationElements.length === 0) return null;
+        
+        const element = precipitationElements[0];
+        const value = element.getAttribute('value');
+        const maxvalue = element.getAttribute('maxvalue');
+        
+        if (maxvalue && parseFloat(maxvalue) > 0) {
+            return parseFloat(maxvalue);
+        }
+        
+        return value ? parseFloat(value) : null;
     }
 }
 

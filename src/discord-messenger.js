@@ -42,16 +42,24 @@ class DiscordMessenger {
     }
     
     aggregatePrecipitationWarnings(warnings) {
-        const dayData = {};
+        const hourlyData = [];
         warnings.forEach(warning => {
-            if (!dayData[warning.date]) {
-                dayData[warning.date] = { totalPrecipitation: 0 };
-            }
             if (warning.precipitation && warning.precipitation > this.config.precipitationThreshold) {
-                dayData[warning.date].totalPrecipitation += warning.precipitation;
+                const time = new Date(warning.time);
+                const timeStr = time.toLocaleTimeString('lv-LV', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    timeZone: 'Europe/Riga'
+                });
+                
+                hourlyData.push({
+                    date: warning.date,
+                    time: timeStr,
+                    precipitation: warning.precipitation
+                });
             }
         });
-        return dayData;
+        return hourlyData;
     }
     
     aggregateWindWarnings(warnings) {
@@ -81,18 +89,22 @@ class DiscordMessenger {
         return hourlyData;
     }
     
-    formatPrecipitationMessage(dayData) {
-        const dayMessages = [];
-        const sortedDates = Object.keys(dayData).sort();
+    formatPrecipitationMessage(hourlyData) {
+        if (hourlyData.length === 0) return null;
         
-        sortedDates.forEach(date => {
-            const data = dayData[date];
-            if (data.totalPrecipitation > 0) {
-                dayMessages.push(`${date} – nokrišņi ${data.totalPrecipitation.toFixed(1)} mm`);
+        const hourlyMessages = [];
+        let currentDate = null;
+        
+        hourlyData.forEach(data => {
+            if (currentDate !== null && currentDate !== data.date) {
+                hourlyMessages.push("");
             }
+            
+            hourlyMessages.push(`${data.date} – ${data.time} – ${data.precipitation.toFixed(1)} mm`);
+            currentDate = data.date;
         });
         
-        return dayMessages.length > 0 ? "⚠️ Gaidāmi nokrišņi:\n" + dayMessages.join("\n") : null;
+        return hourlyMessages.length > 0 ? "⚠️ Gaidāmi nokrišņi:\n" + hourlyMessages.join("\n") : null;
     }
     
     formatWindMessage(hourlyData) {

@@ -10,7 +10,7 @@ class WeatherAnalyzer {
         
         for (const data of weatherData) {
             const hasStrongWind = data.windGust && data.windGust > this.config.windGustThreshold;
-            const hasStrongWindSpeed = data.windSpeed && data.windSpeed > this.config.windSpeedThreshold;
+            const hasStrongWindSpeed = !data.windGust && data.windSpeed && data.windSpeed > this.config.windSpeedThreshold;
             const hasHeavyRain = data.precipitation && data.precipitation > this.config.precipitationThreshold;
             
             let shouldInclude = false;
@@ -68,7 +68,7 @@ class WeatherAnalyzer {
                 dailyData[point.date] = {
                     maxWindGust: 0,
                     maxWindSpeed: 0,
-                    totalPrecipitation: 0,
+                    maxPrecipitation: 0,
                     windCount: 0,
                     precipCount: 0
                 };
@@ -91,7 +91,7 @@ class WeatherAnalyzer {
         }
         
         if (point.precipitation !== null) {
-            dayData.totalPrecipitation += point.precipitation;
+            dayData.maxPrecipitation = Math.max(dayData.maxPrecipitation || 0, point.precipitation);
             dayData.precipCount++;
         }
     }
@@ -99,18 +99,24 @@ class WeatherAnalyzer {
     formatDayData(data, type) {
         if (type === 'precipitation') {
             return data.precipCount > 0 
-                ? `${data.totalPrecipitation.toFixed(1)} mm` 
+                ? `${data.maxPrecipitation.toFixed(1)} mm` 
                 : 'Nav nokrišņu datu';
         }
         
         if (type === 'wind') {
             if (data.windCount === 0) return 'Nav vēja datu';
             
-            let result = `brāzmas ${data.maxWindGust.toFixed(1)} m/s`;
-            if (data.maxWindSpeed > 0) {
-                result += `, vējš ${data.maxWindSpeed.toFixed(1)} m/s`;
+            if (data.maxWindGust > 0) {
+                let result = `brāzmas ${data.maxWindGust.toFixed(1)} m/s`;
+                if (data.maxWindSpeed > 0) {
+                    result += `, vējš ${data.maxWindSpeed.toFixed(1)} m/s`;
+                }
+                return result;
+            } else if (data.maxWindSpeed > 0) {
+                return `vējš ${data.maxWindSpeed.toFixed(1)} m/s`;
             }
-            return result;
+            
+            return 'Nav vēja datu';
         }
         
         return '';
