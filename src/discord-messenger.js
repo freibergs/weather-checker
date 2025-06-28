@@ -44,7 +44,8 @@ class DiscordMessenger {
     aggregatePrecipitationWarnings(warnings) {
         const hourlyData = [];
         warnings.forEach(warning => {
-            if (warning.precipitation && warning.precipitation > this.config.precipitationThreshold) {
+            const precipValue = typeof warning.precipitation === 'object' && warning.precipitation !== null ? warning.precipitation.value : warning.precipitation;
+            if (precipValue && precipValue >= this.config.precipitationThreshold) {
                 const time = new Date(warning.time);
                 const timeStr = time.toLocaleTimeString('lv-LV', {
                     hour: '2-digit',
@@ -52,10 +53,16 @@ class DiscordMessenger {
                     timeZone: 'Europe/Riga'
                 });
                 
+                const precipData = warning.precipitation;
+                const formatText = typeof precipData === 'object' && precipData.minvalue !== null && precipData.minvalue !== precipData.maxvalue
+                    ? `${precipData.minvalue.toFixed(1)} - ${precipData.maxvalue.toFixed(1)} mm`
+                    : `${precipValue.toFixed(1)} mm`;
+                
                 hourlyData.push({
                     date: warning.date,
                     time: timeStr,
-                    precipitation: warning.precipitation
+                    precipitation: precipValue,
+                    formatText: formatText
                 });
             }
         });
@@ -64,11 +71,13 @@ class DiscordMessenger {
     
     aggregateWindWarnings(warnings) {
         const hourlyData = [];
+        const dailyWindOnlyData = {};
+        
         warnings.forEach(warning => {
-            const hasStrongGust = warning.windGust && warning.windGust > this.config.windGustThreshold;
-            const hasStrongWind = warning.windSpeed && warning.windSpeed > this.config.windSpeedThreshold;
+            const hasStrongGust = warning.windGust && warning.windGust >= this.config.windGustThreshold;
+            const hasStrongWind = !warning.windGust && warning.windSpeed && warning.windSpeed >= this.config.windSpeedThreshold;
             
-            if (hasStrongGust || hasStrongWind) {
+            if (hasStrongGust) {
                 const time = new Date(warning.time);
                 const timeStr = time.toLocaleTimeString('lv-LV', {
                     hour: '2-digit',
@@ -81,12 +90,27 @@ class DiscordMessenger {
                     time: timeStr,
                     windSpeed: warning.windSpeed || 0,
                     windGust: warning.windGust || 0,
-                    hasStrongGust,
-                    hasStrongWind
+                    hasStrongGust: true,
+                    hasStrongWind: false
                 });
+            } else if (hasStrongWind) {
+                if (!dailyWindOnlyData[warning.date] || warning.windSpeed > dailyWindOnlyData[warning.date].windSpeed) {
+                    dailyWindOnlyData[warning.date] = {
+                        date: warning.date,
+                        windSpeed: warning.windSpeed,
+                        windGust: 0,
+                        hasStrongGust: false,
+                        hasStrongWind: true
+                    };
+                }
             }
         });
-        return hourlyData;
+        
+        Object.values(dailyWindOnlyData).forEach(data => {
+            hourlyData.push(data);
+        });
+        
+        return hourlyData.sort((a, b) => a.date.localeCompare(b.date));
     }
     
     formatPrecipitationMessage(hourlyData) {
@@ -100,7 +124,7 @@ class DiscordMessenger {
                 hourlyMessages.push("");
             }
             
-            hourlyMessages.push(`${data.date} – ${data.time} – ${data.precipitation.toFixed(1)} mm`);
+            hourlyMessages.push(`${data.date} – ${data.time} – ${data.formatText}`);
             currentDate = data.date;
         });
         
@@ -119,15 +143,14 @@ class DiscordMessenger {
             }
             
             let windInfo = "";
-            if (data.hasStrongGust && data.hasStrongWind) {
-                windInfo = `${data.windSpeed.toFixed(1)} (${data.windGust.toFixed(1)}) – vējš (brāzmās) m/s`;
-            } else if (data.hasStrongGust) {
+            if (data.hasStrongGust) {
                 windInfo = `${data.windSpeed.toFixed(1)} (${data.windGust.toFixed(1)}) – vējš (brāzmās) m/s`;
             } else if (data.hasStrongWind) {
                 windInfo = `${data.windSpeed.toFixed(1)} – vējš m/s`;
             }
             
-            hourlyMessages.push(`${data.date} – ${data.time} – ${windInfo}`);
+            const timeStr = data.time ? ` – ${data.time}` : '';
+            hourlyMessages.push(`${data.date}${timeStr} – ${windInfo}`);
             currentDate = data.date;
         });
         

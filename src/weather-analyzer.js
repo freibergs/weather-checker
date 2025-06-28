@@ -9,9 +9,10 @@ class WeatherAnalyzer {
         const warningDays = new Set();
         
         for (const data of weatherData) {
-            const hasStrongWind = data.windGust && data.windGust > this.config.windGustThreshold;
-            const hasStrongWindSpeed = !data.windGust && data.windSpeed && data.windSpeed > this.config.windSpeedThreshold;
-            const hasHeavyRain = data.precipitation && data.precipitation > this.config.precipitationThreshold;
+            const hasStrongWind = data.windGust && data.windGust >= this.config.windGustThreshold;
+            const hasStrongWindSpeed = !data.windGust && data.windSpeed && data.windSpeed >= this.config.windSpeedThreshold;
+            const precipValue = typeof data.precipitation === 'object' && data.precipitation !== null ? data.precipitation.value : data.precipitation;
+            const hasHeavyRain = precipValue && precipValue >= this.config.precipitationThreshold;
             
             let shouldInclude = false;
             if (type === 'wind' && (hasStrongWind || hasStrongWindSpeed)) shouldInclude = true;
@@ -37,7 +38,8 @@ class WeatherAnalyzer {
                 }
                 
                 if (hasHeavyRain) {
-                    warning.reasons.push(`Nokrišņi: ${data.precipitation} mm`);
+                    const precipValue = typeof data.precipitation === 'object' && data.precipitation !== null ? data.precipitation.value : data.precipitation;
+                    warning.reasons.push(`Nokrišņi: ${precipValue} mm`);
                 }
                 
                 warnings.push(warning);
@@ -91,8 +93,11 @@ class WeatherAnalyzer {
         }
         
         if (point.precipitation !== null) {
-            dayData.maxPrecipitation = Math.max(dayData.maxPrecipitation || 0, point.precipitation);
-            dayData.precipCount++;
+            const precipValue = typeof point.precipitation === 'object' && point.precipitation !== null ? point.precipitation.value : point.precipitation;
+            if (precipValue !== null) {
+                dayData.maxPrecipitation = Math.max(dayData.maxPrecipitation || 0, precipValue);
+                dayData.precipCount++;
+            }
         }
     }
     

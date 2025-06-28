@@ -95,10 +95,15 @@ class WeatherAPI {
         
         const element = precipitationElements[0];
         const value = element.getAttribute('value');
+        const minvalue = element.getAttribute('minvalue');
         const maxvalue = element.getAttribute('maxvalue');
         
         if (maxvalue && parseFloat(maxvalue) > 0) {
-            return parseFloat(maxvalue);
+            return {
+                value: parseFloat(maxvalue),
+                minvalue: minvalue ? parseFloat(minvalue) : null,
+                maxvalue: parseFloat(maxvalue)
+            };
         }
         
         return value ? parseFloat(value) : null;
