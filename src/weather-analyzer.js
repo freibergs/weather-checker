@@ -90,6 +90,9 @@ class WeatherAnalyzer {
         
         if (point.windSpeed !== null) {
             dayData.maxWindSpeed = Math.max(dayData.maxWindSpeed, point.windSpeed);
+            if (point.windGust === null) {
+                dayData.windCount++;
+            }
         }
         
         if (point.precipitation !== null) {
@@ -109,8 +112,6 @@ class WeatherAnalyzer {
         }
         
         if (type === 'wind') {
-            if (data.windCount === 0) return 'Nav vēja datu';
-            
             if (data.maxWindGust > 0) {
                 let result = `brāzmas ${data.maxWindGust.toFixed(1)} m/s`;
                 if (data.maxWindSpeed > 0) {
