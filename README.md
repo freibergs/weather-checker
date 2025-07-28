@@ -29,10 +29,10 @@ For optimal monitoring, run this script as a cron job. Add to your crontab:
 
 ```bash
 # Check weather every 6 hours
-0 */6 * * * cd /path/to/gunsnlasers && node weather-checker.js
+0 */6 * * * cd /path/to/folder && node weather-checker.js
 
 # Or check twice daily (morning and evening)
-0 6,18 * * * cd /path/to/gunsnlasers && node weather-checker.js
+0 6,18 * * * cd /path/to/folder && node weather-checker.js
 ```
 
 The script will automatically check weather conditions and send Discord notifications when warnings are triggered. All activity is logged to `weather-checker.log`.
